@@ -1,6 +1,6 @@
 import socket
-# import selectors
 import os
+
 
 class Servidor:
     """ Classe Servidor, esta classe cria e
@@ -10,72 +10,74 @@ class Servidor:
         self.port = port
         self.host = 'localhost' if local else adrress
         self.socket = None
+        self.path_files = r'Files_Servidor'
         self.files = []
+        for _path, _, files in os.walk(os.path.abspath(self.path_files)):
+            for file in files:
+                self.files.append(file)
 
-    def server_start(self):
+    def start(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((self.host, self.port))
-        self.socket.listen (5)
-        print('Listening on {}:{}'.format(self.host, self.port))
+        self.socket.listen(5)
+        print('Server: Listening on {}:{}'.format(self.host, self.port))
 
-    def file_send(self):
-        conn, addr = self.socket.accept()
-        with conn:
-            print('{} conectado'.format(addr))
+    def file_send(self, conn, file_name):
+        with open('{}{}'.format(self.path_files, file_name), 'rb+') as f:
+            recev = f.read(1024)
+            while recev:
+                conn.send(recev)
+                print('Server: Sent ', repr(recev))
+                recev = f.read(1024)
+        print('Server: file {} was send successfully'.format(file_name))
+
+    def file_recv(self, conn, file_name):
+        with open('{}{}'.format(self.path_files, file_name), 'wb+') as f:
             while True:
+                print('Server: Receiving data...')
                 data = conn.recv(1024)
                 if not data:
                     break
-                conn.sendall(data)
-
-    def file_recv(self):
-        conn, addr = self.socket.accept()
-        with conn:
-            print('{} conectado'.format(addr))
-            while True:
-                data = conn.recv(1024)
-                if not data:
-                    break
-                conn.sendall(data)
+                f.write(data)
+        print('Server: file {} was receved successfully'.format(file_name))
 
     def show_file(self):
-        try:
-            os.mkdir(path=r'Files')
-        except OSError:
-            pass
-
-        self.files = []
-        for _path, _, files in os.walk(os.path.abspath('Files_Servidor')):
-            for file in files:
-                self.files.append(_path, file)
+        return self.files
 
 
-def conect():
-    port = 392817                    # Reserve a port for your service every new transfer wants a new port or you must wait.
-    s = socket.socket()             # Create a socket object
-    host = 'localhost'              # Get local machine name
-    s.bind((host, port))            # Bind to the port
-    s.listen(5)                     # Now wait for client connection.
+def server():
+    s = Servidor()
+    s.start()
+    try:
+        os.mkdir(path=s.path_files)
+    except OSError:
+        pass
+    try:
+        while True:
+            connection, address = s.socket.accept()
+            with connection:
+                print('Server: {} conectado'.format(address))
+                while True:
+                    data = connection.recv(1024)
+                    if not data:
+                        break
+                opc, file_name = str(data).split('-')
+                if opc == 'Show Files':
+                    for file in s.files:
+                        connection.send(file)
+                elif opc == 'Transferir':
+                    s.file_recv(connection, file_name)
+                    connection.send(b'Server: Finishing Connection')
+                    connection.close()
+                elif opc == 'Download':
+                    s.file_send(connection, file_name)
+                    connection.send(b'Server: Finishing Connection')
+                    connection.close()
+                else:
+                    print('Server: Receved {} from Client', repr(data))
+    except KeyboardInterrupt:
+        print('Server: shutting down.....')
 
-    print( 'Server listening....')
 
-
-    while True:
-        conn, addr = s.accept()     # Establish connection with client.
-        print ('Got connection from', addr)
-        data = conn.recv(1024)
-        print('Server received', repr(data))
-
-        filename='TCPSERVER.py' #In the same folder or path is this file running must the file you want to tranfser to be
-        f = open(filename,'rb')
-        l = f.read(1024)
-        while (l):
-           conn.send(l)
-           print('Sent ',repr(l))
-           l = f.read(1024)
-        f.close()
-
-        print('Done sending')
-        conn.send('Thank you for connecting')
-        conn.close()
-
+if __name__ == '__main__':
+    server()

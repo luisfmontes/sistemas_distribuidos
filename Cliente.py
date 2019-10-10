@@ -1,24 +1,39 @@
-import socket                   # Import socket module
+import socket
+import os
 
-s = socket.socket()             # Create a socket object
-host = "1somehing.11somehing."  #Ip address that the TCPServer  is there
-port = 50000                     # Reserve a port for your service every new transfer wants a new port or you must wait.
 
-s.connect((host, port))
-s.send("Hello server!")
+class Client:
+    """ Classe Client, esta classe cria e
+        gerencia as operações do servidor
+    """
+    def __init__(self, host='localhost', port=6028):
+        self.port = port
+        self.host = host
+        self.socket = None
+        self.path_files = r'Files_Client'
+        self.files = []
 
-with open('received_file', 'wb') as f:
-    print 'file opened'
-    while True:
-        print('receiving data...')
-        data = s.recv(1024)
-        print('data=%s', (data))
-        if not data:
-            break
-        # write data to a file
-        f.write(data)
+    def connect(self):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((self.host, self.port))
+        self.socket.send(b'Hello server!')
 
-f.close()
-print('Successfully get the file')
-s.close()
-print('connection closed')
+    def show_file(self):
+        try:
+            os.mkdir(path=self.path_files)
+        except OSError:
+            pass
+
+        self.files = []
+        for _path, _, files in os.walk(os.path.abspath(self.path_files)):
+            for file in files:
+                self.files.append(_path, file)
+
+
+def client():
+    c = Client()
+    c.connect()
+
+
+if __name__ == '__main__':
+    client()

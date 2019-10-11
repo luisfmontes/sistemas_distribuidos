@@ -19,30 +19,28 @@ class Servidor:
     def start(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((self.host, self.port))
-        self.socket.listen(5)
+        self.socket.listen()
         print('Server: Listening on {}:{}'.format(self.host, self.port))
 
     def file_send(self, conn, file_name):
         with open('{}{}'.format(self.path_files, file_name), 'rb+') as f:
-            recev = f.read(1024)
-            while recev:
-                conn.send(recev)
-                print('Server: Sent ', repr(recev))
-                recev = f.read(1024)
+            data = f.read(1024)
+            while data:
+                print('Server: Sending data...')
+                conn.send(data)
+                data = f.read(1024)
         print('Server: file {} was send successfully'.format(file_name))
 
     def file_recv(self, conn, file_name):
         with open('{}{}'.format(self.path_files, file_name), 'wb+') as f:
             while True:
                 print('Server: Receiving data...')
-                data = conn.recv(1024)
-                if not data:
+                recev = conn.recv(1024)
+                if not recev:
                     break
-                f.write(data)
+                f.write(recev)
+                f.close()
         print('Server: file {} was receved successfully'.format(file_name))
-
-    def show_file(self):
-        return self.files
 
 
 def server():
@@ -52,20 +50,24 @@ def server():
         os.mkdir(path=s.path_files)
     except OSError:
         pass
-    try:
-        while True:
-            connection, address = s.socket.accept()
-            with connection:
-                print('Server: {} conectado'.format(address))
-                while True:
-                    data = connection.recv(1024)
-                    if not data:
-                        break
-                opc, file_name = str(data).split('-')
+    while True:
+        connection, address = s.socket.accept()
+        print('Server: Client {} connected'.format(address))
+        with connection:
+            while True:
+                data = connection.recv(1024)
+                if not data:
+                    break
+                try:
+                    opc, file_name = str(data.decode()).split('-')
+                except ValueError:
+                    opc = str(data.decode())
+
                 if opc == 'Show Files':
                     for file in s.files:
                         connection.send(file)
                 elif opc == 'Transferir':
+                    print('transferencia')
                     s.file_recv(connection, file_name)
                     connection.send(b'Server: Finishing Connection')
                     connection.close()
@@ -74,9 +76,9 @@ def server():
                     connection.send(b'Server: Finishing Connection')
                     connection.close()
                 else:
-                    print('Server: Receved {} from Client', repr(data))
-    except KeyboardInterrupt:
-        print('Server: shutting down.....')
+                    print('Server: Receved {} from Client'.format(data))
+    # except KeyboardInterrupt:
+    #     print('Server: shutting down.....')
 
 
 if __name__ == '__main__':
